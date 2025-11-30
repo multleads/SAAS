@@ -1,0 +1,32 @@
+# Render.yaml - configura serviços para Render.com
+# Importe este arquivo no Render ou deixe o Render detectá-lo.
+# Substitua os valores de env por suas chaves no painel do Render (não coloque segredos aqui).
+services:
+  - type: static
+    name: saas-frontend
+    repo: https://github.com/multleads/SAAS
+    branch: main
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    publishPath: build
+    env:
+      - key: REACT_APP_SUPABASE_ANON_KEY
+      - key: REACT_APP_API_URL
+      - key: REACT_APP_SITE_URL
+
+  - type: web
+    name: saas-backend
+    repo: https://github.com/multleads/SAAS
+    branch: main
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    env:
+      - key: DATABASE_URL
+      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: SUPABASE_URL
+      - key: JWT_SECRET
+      - key: CORS_ORIGIN
+      - key: FRONTEND_URL
+    healthCheckPath: /health
+    plan: starter
