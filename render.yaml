@@ -18,6 +18,7 @@ services:
     name: saas-backend
     repo: https://github.com/multleads/SAAS
     branch: main
+    id: srv-d4m5mindiees739rvubg
     rootDir: backend
     buildCommand: npm ci && npm run build
     startCommand: npm run start
@@ -27,6 +28,8 @@ services:
       - key: SUPABASE_URL
       - key: JWT_SECRET
       - key: CORS_ORIGIN
+        value: https://appmultleads.netlify.app
       - key: FRONTEND_URL
+        value: https://appmultleads.netlify.app
     healthCheckPath: /health
     plan: starter
