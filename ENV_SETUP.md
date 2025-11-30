@@ -48,6 +48,7 @@ JWT_SECRET=sua-chave-gerada-aqui
 REACT_APP_SUPABASE_URL=https://seu-projeto.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOi...
 REACT_APP_API_URL=http://localhost:3001
+REACT_APP_SITE_URL=https://appmultleads.netlify.app
 ```
 
 ### Backend
@@ -71,6 +72,7 @@ SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 REACT_APP_SUPABASE_URL=https://abcdefghij.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWoiLCJyb2xlIjoiYW5vbiJ9.XXXXXXXXXX
 REACT_APP_API_URL=http://localhost:3001
+REACT_APP_SITE_URL=https://appmultleads.netlify.app
 
 # Backend
 PORT=3001
