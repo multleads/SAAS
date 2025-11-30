@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS MultiLeads - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 900px;
+            width: 100%;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 2px solid #667eea;
+        }
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+        .status {
+            background: #f0f9ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+        .status.success {
+            background: #f0fdf4;
+            border-left-color: #22c55e;
+        }
+        .status.error {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+        }
+        .status p {
+            margin: 5px 0;
+            color: #333;
+        }
+        .status strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+        .logo-demo {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .logo-demo img {
+            max-width: 150px;
+            height: auto;
+            margin: 0 10px;
+            border-radius: 8px;
+        }
+        .banner-demo {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .banner-demo img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+        .credentials {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .credentials p {
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+        }
+        footer {
+            background: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 SaaS MultiLeads</h1>
+            <p>Plataforma de Gestão com 3 Camadas de Usuários</p>
+        </div>
+        
+        <div class="content">
+            <!-- Sistema de Status -->
+            <div class="section">
+                <h2>Status do Sistema</h2>
+                <div id="status" class="status">
+                    <p>Verificando conexão...</p>
+                </div>
+            </div>
+
+            <!-- Credenciais de Teste -->
+            <div class="section">
+                <h2>Credenciais de Teste</h2>
+                <div class="credentials">
+                    <p><strong>👤 Admin:</strong></p>
+                    <p>Email: <code>admin@example.com</code></p>
+                    <p>Senha: <code>admin123</code></p>
+                </div>
+                <div class="credentials">
+                    <p><strong>🏢 Empresa:</strong></p>
+                    <p>Email: <code>empresa@example.com</code></p>
+                    <p>Senha: <code>empresa123</code></p>
+                </div>
+            </div>
+
+            <!-- Visões de Usuário -->
+            <div class="section">
+                <h2>👥 Visões de Usuário</h2>
+                <p>Acesse diferentes interfaces conforme seu perfil:</p>
+                <div class="buttons">
+                    <button class="btn-primary" onclick="goToAdmin()">
+                        🔐 Painel Admin
+                    </button>
+                    <button class="btn-primary" onclick="goToEmpresa()">
+                        🏢 Painel Empresa
+                    </button>
+                    <button class="btn-primary" onclick="goToCliente()">
+                        📋 Cadastro Cliente
+                    </button>
+                </div>
+            </div>
+
+            <!-- Demo do Cadastro Cliente com Logo/Banner -->
+            <div class="section">
+                <h2>🎨 Preview - Cadastro do Cliente</h2>
+                <p>Assim o cliente vê o logo e banner do produto:</p>
+                <div class="logo-demo" id="logoContainer">
+                    <p>Carregando logo...</p>
+                </div>
+                <div class="banner-demo" id="bannerContainer">
+                    <p>Carregando banner...</p>
+                </div>
+                <button class="btn-secondary" onclick="loadProductImages()">
+                    🔄 Recarregar Imagens
+                </button>
+            </div>
+
+            <!-- Testes de API -->
+            <div class="section">
+                <h2>🧪 Testes de API</h2>
+                <p>Teste os endpoints principais:</p>
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="testHealth()">
+                        ✅ Health Check
+                    </button>
+                    <button class="btn-secondary" onclick="testAdminLogin()">
+                        🔐 Login Admin
+                    </button>
+                    <button class="btn-secondary" onclick="testEmpresaLogin()">
+                        🏢 Login Empresa
+                    </button>
+                    <button class="btn-secondary" onclick="testGetProduct()">
+                        📦 Get Product
+                    </button>
+                </div>
+                <div id="apiResponse" class="status" style="display:none; margin-top: 15px;">
+                    <strong>Resposta da API:</strong>
+                    <pre id="responseText" style="background: white; padding: 10px; border-radius: 4px; overflow-x: auto;"></pre>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>✨ SaaS MultiLeads © 2024 | Desenvolvido com ❤️ para demonstração</p>
+            <p>Backend: http://localhost:3001 | Frontend: http://localhost:3000</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3001';
+
+        // Verificar status do backend ao carregar
+        window.addEventListener('DOMContentLoaded', async () => {
+            await checkBackendStatus();
+            await loadProductImages();
+        });
+
+        async function checkBackendStatus() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                const statusDiv = document.getElementById('status');
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = `
+                    <strong>✅ Backend Conectado!</strong>
+                    <p>Status: ${data.status}</p>
+                    <p>Mensagem: ${data.message}</p>
+                `;
+            } catch (error) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <strong>❌ Erro ao Conectar ao Backend</strong>
+                    <p>Certifique-se de que o servidor está rodando em ${API_URL}</p>
+                    <p>Erro: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function loadProductImages() {
+            try {
+                const response = await fetch(`${API_URL}/api/cliente/produto/1`);
+                const product = await response.json();
+                
+                document.getElementById('logoContainer').innerHTML = 
+                    `<img src="${product.logo}" alt="Logo do Produto" title="${product.nome}">`;
+                
+                document.getElementById('bannerContainer').innerHTML = 
+                    `<img src="${product.banner}" alt="Banner do Produto" title="${product.nome}">`;
+            } catch (error) {
+                document.getElementById('logoContainer').innerHTML = 
+                    `<p style="color: #ef4444;">Erro ao carregar logo: ${error.message}</p>`;
+                document.getElementById('bannerContainer').innerHTML = 
+                    `<p style="color: #ef4444;">Erro ao carregar banner: ${error.message}</p>`;
+            }
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                showAPIResponse(data);
+            } catch (error) {
+                showAPIResponse({ error: error.message });
+            }
+        }
+
+        async function testAdminLogin() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'admin@example.com', senha: 'admin123' })
+                });
+                const data = await response.json();
+                showAPIResponse(data);
+            } catch (error) {
+                showAPIResponse({ error: error.message });
+            }
+        }
+
+        async function testEmpresaLogin() {
+            try {
+                const response = await fetch(`${API_URL}/api/empresa/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'empresa@example.com', senha: 'empresa123' })
+                });
+                const data = await response.json();
+                showAPIResponse(data);
+            } catch (error) {
+                showAPIResponse({ error: error.message });
+            }
+        }
+
+        async function testGetProduct() {
+            try {
+                const response = await fetch(`${API_URL}/api/cliente/produto/1`);
+                const data = await response.json();
+                showAPIResponse(data);
+            } catch (error) {
+                showAPIResponse({ error: error.message });
+            }
+        }
+
+        function showAPIResponse(data) {
+            const responseDiv = document.getElementById('apiResponse');
+            const responseText = document.getElementById('responseText');
+            responseText.textContent = JSON.stringify(data, null, 2);
+            responseDiv.style.display = 'block';
+        }
+
+        function goToAdmin() {
+            alert('Painel Admin não está disponível nesta demo simplificada.\n\nCom a instalação completa do projeto React, você teria acesso em:\nhttp://localhost:3000/admin\n\nCredenciais: admin@example.com / admin123');
+        }
+
+        function goToEmpresa() {
+            alert('Painel Empresa não está disponível nesta demo simplificada.\n\nCom a instalação completa do projeto React, você teria acesso em:\nhttp://localhost:3000/empresa\n\nCredenciais: empresa@example.com / empresa123');
+        }
+
+        function goToCliente() {
+            alert('Página de Cadastro do Cliente não está disponível nesta demo simplificada.\n\nCom a instalação completa do projeto React, você teria acesso em:\nhttp://localhost:3000/cliente/1\n\nEsta página exibiria o logo e banner do produto conforme especificado.');
+        }
+    </script>
+</body>
+</html>
