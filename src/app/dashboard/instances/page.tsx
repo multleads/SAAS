@@ -183,6 +183,18 @@ export default function InstancesPage() {
     }
   };
 
+  const handleDelete = async (instanceId: number) => {
+    if (!confirm('Tem certeza que deseja EXCLUIR esta instância? Esta ação não pode ser desfeita.')) return;
+    
+    try {
+      await api.delete(`/whatsapp-instances/${instanceId}`);
+      toast.success('Instância excluída com sucesso!');
+      fetchInstances();
+    } catch (error: any) {
+      toast.error('Erro ao excluir instância');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -293,12 +305,19 @@ export default function InstancesPage() {
                 >
                   {instance.status === 'connected' ? '✓ Conectado' : 'Conectar'}
                 </button>
-                {instance.status === 'connected' && (
+                {instance.status === 'connected' ? (
                   <button 
                     onClick={() => handleDisconnect(instance.id)}
                     className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
                   >
                     Desconectar
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => handleDelete(instance.id)}
+                    className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
+                  >
+                    🗑️
                   </button>
                 )}
               </div>
