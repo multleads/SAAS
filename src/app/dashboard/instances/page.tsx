@@ -187,7 +187,7 @@ export default function InstancesPage() {
     if (!confirm('Tem certeza que deseja EXCLUIR esta instância? Esta ação não pode ser desfeita.')) return;
     
     try {
-      await api.delete(`/whatsapp-instances/${instanceId}`);
+      await api.delete(`/whatsapp-instances?id=${instanceId}`);
       toast.success('Instância excluída com sucesso!');
       fetchInstances();
     } catch (error: any) {
