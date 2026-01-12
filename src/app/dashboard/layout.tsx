@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
+import GlobalAiPoller from '@/components/GlobalAiPoller';
 
 export default function DashboardLayout({
   children,
@@ -12,13 +13,21 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, _hasHydrated } = useAuthStore();
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
+    if (_hasHydrated) {
+      setIsReady(true);
+      if (!user) {
+        router.push('/login');
+      }
     }
-  }, [user, router]);
+  }, [user, _hasHydrated, router]);
+
+  if (!isReady) {
+    return <div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
+  }
 
   if (!user) {
     return null;
@@ -26,6 +35,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
+      <GlobalAiPoller />
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />

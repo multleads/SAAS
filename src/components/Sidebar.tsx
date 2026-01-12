@@ -13,6 +13,10 @@ import {
   Smartphone,
   Settings,
   LogOut,
+  BookOpen,
+  UserPlus,
+  Package,
+  Megaphone,
 } from 'lucide-react';
 
 const menuItems = [
@@ -41,10 +45,34 @@ const menuItems = [
     roles: ['admin_master', 'admin_company'],
   },
   {
+    label: 'Clientes',
+    href: '/dashboard/clients',
+    icon: UserPlus,
+    roles: ['admin_master', 'admin_company'],
+  },
+  {
+    label: 'Produtos',
+    href: '/dashboard/products',
+    icon: Package,
+    roles: ['admin_master', 'admin_company'],
+  },
+  {
+    label: 'Campanhas',
+    href: '/dashboard/campaigns',
+    icon: Megaphone,
+    roles: ['admin_master', 'admin_company'],
+  },
+  {
     label: 'Empresas',
     href: '/dashboard/companies',
     icon: Building2,
     roles: ['admin_master'],
+  },
+  {
+    label: 'Base de Conhecimento',
+    href: '/dashboard/knowledge-base',
+    icon: BookOpen,
+    roles: ['admin_master', 'admin_company'],
   },
   {
     label: 'Configurações',

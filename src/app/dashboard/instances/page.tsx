@@ -56,12 +56,26 @@ export default function InstancesPage() {
       const response = await api.get('/whatsapp-instances');
       let allInstances = response.data.data || [];
       
-      // Filter by company for admin_company
-      if (currentUser?.role === 'admin_company') {
-        allInstances = allInstances.filter((inst: any) => inst.company_id === currentUser.company_id);
+      // Filter by company for non-master admins
+      if (currentUser?.role !== 'admin_master') {
+        allInstances = allInstances.filter((inst: any) => inst.company_id === currentUser?.company_id);
       }
       
-      setInstances(allInstances);
+      // Check real status from Evolution API for each instance
+      const updatedInstances = await Promise.all(
+        allInstances.map(async (inst: any) => {
+          try {
+            const statusRes = await fetch(`/api/status?instance=${encodeURIComponent(inst.instance_name)}`);
+            const statusData = await statusRes.json();
+            const state = statusData.data?.state || statusData.data?.instance?.state;
+            return { ...inst, status: state === 'open' ? 'connected' : 'disconnected' };
+          } catch {
+            return inst;
+          }
+        })
+      );
+      
+      setInstances(updatedInstances);
     } catch (error: any) {
       toast.error('Erro ao carregar instâncias');
     } finally {
@@ -74,9 +88,9 @@ export default function InstancesPage() {
       const response = await api.get('/users');
       let allUsers = response.data.data || [];
       
-      // Filter by company
-      if (currentUser?.role === 'admin_company') {
-        allUsers = allUsers.filter((u: User) => u.company_id === currentUser.company_id);
+      // Filter by company for non-master admins
+      if (currentUser?.role !== 'admin_master') {
+        allUsers = allUsers.filter((u: User) => u.company_id === currentUser?.company_id);
       }
       
       setUsers(allUsers);
@@ -108,6 +122,16 @@ export default function InstancesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // 1. Create in Evolution API first
+      const evoResponse = await fetch('/api/evolution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', instanceName: formData.instance_name })
+      });
+      const evoData = await evoResponse.json();
+      console.log('Evolution response:', evoData);
+      
+      // 2. Then save to database
       await api.post('/whatsapp-instances', formData);
       toast.success('Instância criada com sucesso!');
       setShowModal(false);
@@ -137,7 +161,7 @@ export default function InstancesPage() {
       const instance = instances.find(i => i.id === instanceId);
       if (!instance) throw new Error('Instance not found');
       
-      const response = await fetch(`http://talkagents.br.com/public_html/public/qrcode_direct.php?instance=${encodeURIComponent(instance.instance_name)}&action=connect`);
+      const response = await fetch(`/api/qrcode?instance=${encodeURIComponent(instance.instance_name)}&action=connect`);
       const data = await response.json();
       console.log('QR Response:', data);
       
@@ -158,9 +182,15 @@ export default function InstancesPage() {
 
   const checkConnectionStatus = async (instanceId: number) => {
     try {
-      const response = await api.get(`/whatsapp-instances/${instanceId}/status`);
-      if (response.data.success) {
-        const status = response.data.data.status;
+      const instance = instances.find(i => i.id === instanceId);
+      if (!instance) return;
+      
+      const response = await fetch(`/api/status?instance=${encodeURIComponent(instance.instance_name)}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        const state = result.data?.state || result.data?.instance?.state;
+        const status = state === 'open' ? 'connected' : 'disconnected';
         
         // Atualiza o status da instância selecionada
         if (selectedInstance && selectedInstance.id === instanceId) {
@@ -186,7 +216,16 @@ export default function InstancesPage() {
     if (!confirm('Tem certeza que deseja desconectar esta instância?')) return;
     
     try {
-      await api.post(`/whatsapp-instances/${instanceId}/disconnect`);
+      const instance = instances.find(i => i.id === instanceId);
+      if (!instance) return;
+      
+      // Disconnect via Evolution API
+      await fetch('/api/evolution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout', instanceName: instance.instance_name })
+      });
+      
       toast.success('Instância desconectada com sucesso!');
       fetchInstances();
     } catch (error: any) {
@@ -198,6 +237,17 @@ export default function InstancesPage() {
     if (!confirm('Tem certeza que deseja EXCLUIR esta instância? Esta ação não pode ser desfeita.')) return;
     
     try {
+      const instance = instances.find(i => i.id === instanceId);
+      if (!instance) return;
+      
+      // Delete from Evolution API first
+      await fetch('/api/evolution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', instanceName: instance.instance_name })
+      });
+      
+      // Then delete from database
       await api.delete(`/whatsapp-instances?id=${instanceId}`);
       toast.success('Instância excluída com sucesso!');
       fetchInstances();
