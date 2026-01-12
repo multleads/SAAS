@@ -134,9 +134,18 @@ export default function InstancesPage() {
   const generateQRCode = async (instanceId: number) => {
     setQrLoading(true);
     try {
-      const response = await api.post(`/whatsapp-instances/${instanceId}/connect`);
-      if (response.data.success) {
-        setQrCode(response.data.data.qrcode);
+      // Get instance name first
+      const instance = instances.find(i => i.id === instanceId);
+      if (!instance) throw new Error('Instance not found');
+      
+      // Call direct PHP endpoint
+      const response = await fetch(`http://talkagents.br.com/public_html/public/qrcode_direct.php?instance=${encodeURIComponent(instance.instance_name)}&action=connect`);
+      const data = await response.json();
+      
+      if (data.success && data.data?.base64) {
+        setQrCode(data.data.base64);
+      } else {
+        throw new Error('QR Code not found');
       }
     } catch (error: any) {
       toast.error('Erro ao gerar QR Code');
