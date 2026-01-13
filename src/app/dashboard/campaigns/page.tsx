@@ -256,21 +256,35 @@ export default function CampaignsPage() {
           .replace(/{nome}/g, client.name)
           .replace(/{telefone}/g, client.phone);
 
-        await api.post(`/api/evolution/message/sendText/${instanceName}`, {
-          number: remoteJid,
-          text: personalizedMessage
+        const textResponse = await fetch('/api/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instance: instanceName,
+            remoteJid,
+            message: personalizedMessage
+          })
         });
+        const textData = await textResponse.json();
+        console.log('Text message sent:', textData);
         await delay(1000);
       }
 
       // Send extra image if exists
       if (extraImage) {
-        await api.post(`/api/evolution/message/sendMedia/${instanceName}`, {
-          number: remoteJid,
-          mediatype: 'image',
-          media: extraImage,
-          caption: ''
+        const mediaResponse = await fetch('/api/send-media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instance: instanceName,
+            remoteJid,
+            media: extraImage,
+            mediatype: 'image',
+            caption: ''
+          })
         });
+        const mediaData = await mediaResponse.json();
+        console.log('Extra image sent:', mediaData);
         await delay(1500);
       }
 
@@ -280,12 +294,19 @@ export default function CampaignsPage() {
         if (catalog) {
           for (const product of catalog.products) {
             if (product.imageUrl) {
-              await api.post(`/api/evolution/message/sendMedia/${instanceName}`, {
-                number: remoteJid,
-                mediatype: 'image',
-                media: product.imageUrl,
-                caption: product.name
+              const productResponse = await fetch('/api/send-media', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  instance: instanceName,
+                  remoteJid,
+                  media: product.imageUrl,
+                  mediatype: 'image',
+                  caption: product.name
+                })
               });
+              const productData = await productResponse.json();
+              console.log('Product image sent:', product.name, productData);
               await delay(2000); // Delay between products
             }
           }
