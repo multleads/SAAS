@@ -53,12 +53,14 @@ export default function ProductsPage() {
     }
   }, [user?.company_id]);
 
+  const BACKEND_URL = 'http://talkagents.br.com/public_html/api_proxy.php';
+
   const loadCatalogs = async () => {
     if (!user?.company_id) return;
     
     setLoading(true);
     try {
-      const response = await fetch(`/api/catalogs?company_id=${user.company_id}`);
+      const response = await fetch(`${BACKEND_URL}?path=catalogs&company_id=${user.company_id}`);
       const data = await response.json();
       
       if (data.success && Array.isArray(data.data)) {
@@ -76,7 +78,7 @@ export default function ProductsPage() {
 
   const loadCatalogProducts = async (catalogId: string) => {
     try {
-      const response = await fetch(`/api/catalogs?id=${catalogId}`);
+      const response = await fetch(`${BACKEND_URL}?path=catalogs&id=${catalogId}`);
       const data = await response.json();
       
       if (data.success && data.data) {
@@ -164,7 +166,7 @@ export default function ProductsPage() {
     setSaving(true);
     try {
       if (editingCatalog) {
-        const response = await fetch(`/api/catalogs?id=${editingCatalog.id}`, {
+        const response = await fetch(`${BACKEND_URL}?path=catalogs&id=${editingCatalog.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: catalogName.trim(), description: catalogDescription.trim() })
@@ -177,7 +179,7 @@ export default function ProductsPage() {
           toast.error(data.message || 'Erro ao atualizar catálogo');
         }
       } else {
-        const response = await fetch('/api/catalogs', {
+        const response = await fetch(`${BACKEND_URL}?path=catalogs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -220,7 +222,7 @@ export default function ProductsPage() {
   const handleDeleteCatalog = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este catálogo e todos os seus produtos?')) {
       try {
-        const response = await fetch(`/api/catalogs?id=${id}`, { method: 'DELETE' });
+        const response = await fetch(`${BACKEND_URL}?path=catalogs&id=${id}`, { method: 'DELETE' });
         const data = await response.json();
         if (data.success) {
           if (selectedCatalog?.id === id) {
@@ -258,7 +260,7 @@ export default function ProductsPage() {
     setSaving(true);
     try {
       if (editingProduct) {
-        const response = await fetch(`/api/catalog-products?id=${editingProduct.id}`, {
+        const response = await fetch(`${BACKEND_URL}?path=catalog-products&id=${editingProduct.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -277,7 +279,7 @@ export default function ProductsPage() {
           toast.error(data.message || 'Erro ao atualizar produto');
         }
       } else {
-        const response = await fetch('/api/catalog-products', {
+        const response = await fetch(`${BACKEND_URL}?path=catalog-products`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -331,7 +333,7 @@ export default function ProductsPage() {
     if (!selectedCatalog) return;
     if (confirm('Tem certeza que deseja excluir este produto?')) {
       try {
-        const response = await fetch(`/api/catalog-products?id=${productId}`, { method: 'DELETE' });
+        const response = await fetch(`${BACKEND_URL}?path=catalog-products&id=${productId}`, { method: 'DELETE' });
         const data = await response.json();
         if (data.success) {
           loadCatalogProducts(selectedCatalog.id);
