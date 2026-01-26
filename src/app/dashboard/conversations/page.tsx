@@ -399,20 +399,44 @@ export default function ConversationsPage() {
     }
   };
 
-  const toggleAutoAi = () => {
+  const toggleAutoAi = async () => {
     if (!user?.id) return;
     const remoteJid = getChatRemoteJid(selectedChat);
-    if (!remoteJid) {
+    if (!remoteJid || !connectedInstance) {
       toast.error('Selecione uma conversa para alternar o controle');
       return;
     }
 
     const newState = !autoAiPaused;
     setAutoAiPaused(newState);
+    
+    // Save to localStorage (for frontend)
     if (newState) {
       localStorage.setItem(`ai_paused_${user.id}_${remoteJid}`, 'true');
     } else {
       localStorage.removeItem(`ai_paused_${user.id}_${remoteJid}`);
+    }
+    
+    // Save to backend (for webhook)
+    try {
+      if (newState) {
+        await fetch('/api/paused-chats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instance_name: connectedInstance,
+            remote_jid: remoteJid,
+            company_id: user.company_id,
+            paused_by: user.id
+          })
+        });
+      } else {
+        await fetch(`/api/paused-chats?instance_name=${encodeURIComponent(connectedInstance)}&remote_jid=${encodeURIComponent(remoteJid)}`, {
+          method: 'DELETE'
+        });
+      }
+    } catch (error) {
+      console.log('Error syncing pause state to backend:', error);
     }
     
     if (newState) {

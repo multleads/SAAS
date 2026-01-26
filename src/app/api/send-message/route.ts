@@ -11,8 +11,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Instance, remoteJid and message required' }, { status: 400 });
     }
     
-    // Format number for Evolution API
-    const number = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+    // Format number for Evolution API - remove @ suffix and ensure country code
+    let number = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+    
+    // Add Brazil country code if not present (for numbers starting with DDD)
+    if (number.length === 11 && !number.startsWith('55')) {
+      number = '55' + number;
+    } else if (number.length === 10 && !number.startsWith('55')) {
+      number = '55' + number;
+    }
+    
+    console.log('Sending message to:', number, 'via instance:', instance);
     
     const response = await fetch(`${EVOLUTION_URL}/message/sendText/${instance}`, {
       method: 'POST',
@@ -27,8 +36,10 @@ export async function POST(request: Request) {
     });
     
     const data = await response.json();
+    console.log('Evolution API response:', data);
     return NextResponse.json({ success: response.ok, data });
   } catch (error: any) {
+    console.error('Send message error:', error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }

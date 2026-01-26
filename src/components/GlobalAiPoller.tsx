@@ -1,5 +1,16 @@
 'use client';
 
+// DISABLED: AI responses are now handled by the webhook server-side
+// This component is kept for backwards compatibility but does nothing
+// The webhook at /api/webhook handles all AI responses 24/7
+
+export default function GlobalAiPoller() {
+  // Webhook handles all AI responses now - no frontend polling needed
+  return null;
+}
+
+/* ORIGINAL CODE BELOW - DISABLED TO PREVENT DUPLICATE RESPONSES
+
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
@@ -120,14 +131,32 @@ export default function GlobalAiPoller() {
     }
   }, [user]);
 
-  // Check if AI should be active
+  // Check if AI should be active and sync settings to server for webhook
   useEffect(() => {
     const settings = getAiSettings();
     const shouldBeActive = settings?.auto_ai_response && 
                           settings?.openai_api_key && 
                           isWithinWorkingHours(settings);
     setIsActive(shouldBeActive);
-  }, [user]);
+    
+    // Sync settings to server for webhook background processing
+    if (connectedInstance && settings?.openai_api_key) {
+      fetch('/api/ai-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instance: connectedInstance,
+          openai_api_key: settings.openai_api_key,
+          model: settings.model || 'gpt-4',
+          auto_ai_response: settings.auto_ai_response,
+          knowledge_base: getKnowledgeBase()
+        })
+      })
+      .then(res => res.json())
+      .then(data => console.log('GlobalAiPoller: Settings synced to server:', data.success))
+      .catch(err => console.log('Failed to sync settings to server:', err));
+    }
+  }, [user, connectedInstance]);
 
   // Global polling for new messages
   useEffect(() => {
@@ -361,3 +390,5 @@ export default function GlobalAiPoller() {
   // This component doesn't render anything visible
   return null;
 }
+
+*/

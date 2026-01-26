@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 interface KnowledgeItem {
@@ -26,17 +25,40 @@ export default function KnowledgeBasePage() {
     answer: '',
     category: '',
   });
+  const [syncing, setSyncing] = useState(false);
+  const [hasLocalData, setHasLocalData] = useState(false);
 
+  // Check if there's localStorage data to sync
   useEffect(() => {
-    fetchItems();
+    const stored = localStorage.getItem('knowledge_base');
+    if (stored) {
+      const localItems = JSON.parse(stored);
+      setHasLocalData(localItems.length > 0);
+    }
   }, []);
 
+  useEffect(() => {
+    if (user?.company_id) {
+      fetchItems();
+    }
+  }, [user?.company_id]);
+
   const fetchItems = async () => {
+    if (!user?.company_id) return;
     try {
-      const response = await api.get('/knowledge-base');
-      setItems(response.data.data || []);
+      const response = await fetch(`/api/knowledge-base?company_id=${user.company_id}`);
+      const data = await response.json();
+      if (data.success) {
+        setItems(data.data || []);
+      } else {
+        // Fallback to localStorage
+        const stored = localStorage.getItem('knowledge_base');
+        if (stored) {
+          setItems(JSON.parse(stored));
+        }
+      }
     } catch (error) {
-      // If API doesn't exist, use local storage
+      // Fallback to localStorage
       const stored = localStorage.getItem('knowledge_base');
       if (stored) {
         setItems(JSON.parse(stored));
@@ -46,36 +68,33 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  const saveToLocalStorage = (newItems: KnowledgeItem[]) => {
-    localStorage.setItem('knowledge_base', JSON.stringify(newItems));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       if (editingItem) {
-        // Update existing
-        const updated = items.map(item => 
-          item.id === editingItem.id 
-            ? { ...item, ...formData }
-            : item
-        );
-        setItems(updated);
-        saveToLocalStorage(updated);
+        // Update existing via API
+        await fetch(`/api/knowledge-base?id=${editingItem.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
         toast.success('Item atualizado com sucesso!');
       } else {
-        // Create new
-        const newItem: KnowledgeItem = {
-          id: Date.now(),
-          ...formData,
-          created_at: new Date().toISOString(),
-        };
-        const newItems = [...items, newItem];
-        setItems(newItems);
-        saveToLocalStorage(newItems);
+        // Create new via API
+        await fetch('/api/knowledge-base', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_id: user?.company_id,
+            ...formData
+          })
+        });
         toast.success('Item adicionado com sucesso!');
       }
+      
+      // Refresh list
+      await fetchItems();
       
       setShowModal(false);
       setEditingItem(null);
@@ -95,12 +114,63 @@ export default function KnowledgeBasePage() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Tem certeza que deseja excluir este item?')) {
-      const filtered = items.filter(item => item.id !== id);
-      setItems(filtered);
-      saveToLocalStorage(filtered);
-      toast.success('Item excluído com sucesso!');
+      try {
+        await fetch(`/api/knowledge-base?id=${id}`, { method: 'DELETE' });
+        await fetchItems();
+        toast.success('Item excluído com sucesso!');
+      } catch (error) {
+        toast.error('Erro ao excluir item');
+      }
+    }
+  };
+
+  const syncLocalStorageToDatabase = async () => {
+    if (!user?.company_id) return;
+    
+    const stored = localStorage.getItem('knowledge_base');
+    if (!stored) {
+      toast.error('Nenhum dado local encontrado');
+      return;
+    }
+    
+    const localItems = JSON.parse(stored);
+    if (localItems.length === 0) {
+      toast.error('Nenhum item para sincronizar');
+      return;
+    }
+    
+    setSyncing(true);
+    let synced = 0;
+    
+    try {
+      for (const item of localItems) {
+        await fetch('/api/knowledge-base', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_id: user.company_id,
+            question: item.question,
+            answer: item.answer,
+            category: item.category || 'Geral'
+          })
+        });
+        synced++;
+      }
+      
+      // Clear localStorage after successful sync
+      localStorage.removeItem('knowledge_base');
+      setHasLocalData(false);
+      
+      // Refresh list
+      await fetchItems();
+      
+      toast.success(`${synced} itens sincronizados com sucesso!`);
+    } catch (error) {
+      toast.error('Erro ao sincronizar alguns itens');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -136,6 +206,25 @@ export default function KnowledgeBasePage() {
           ➕ Adicionar Item
         </button>
       </div>
+
+      {/* Sync Banner */}
+      {hasLocalData && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-medium text-yellow-800">Dados locais encontrados</h3>
+            <p className="text-sm text-yellow-700">
+              Você tem itens salvos localmente que precisam ser sincronizados com o banco de dados para a IA usar.
+            </p>
+          </div>
+          <button
+            onClick={syncLocalStorageToDatabase}
+            disabled={syncing}
+            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
+          >
+            {syncing ? '⏳ Sincronizando...' : '🔄 Sincronizar Agora'}
+          </button>
+        </div>
+      )}
 
       {/* Items List */}
       <div className="grid gap-4">

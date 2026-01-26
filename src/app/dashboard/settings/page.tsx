@@ -18,6 +18,7 @@ export default function SettingsPage() {
     openai_api_key: '',
     auto_ai_response: false,
     auto_ai_during_hours: true,
+    support_phone: '',
   });
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'disconnected' | 'error'>('checking');
@@ -84,9 +85,30 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Save to localStorage
     localStorage.setItem(`ai_settings_${user?.company_id}`, JSON.stringify(aiSettings));
+    
+    // Also save to backend for webhook access (multi-company support)
+    if (user?.company_id && aiSettings.openai_api_key) {
+      try {
+        await fetch('/api/company-ai-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_id: user.company_id,
+            openai_api_key: aiSettings.openai_api_key,
+            model: aiSettings.model,
+            auto_ai_response: aiSettings.auto_ai_response,
+            support_phone: aiSettings.support_phone
+          })
+        });
+        console.log('AI settings synced to backend for webhook');
+      } catch (error) {
+        console.log('Failed to sync AI settings to backend:', error);
+      }
+    }
+    
     toast.success('Configurações salvas com sucesso!');
   };
 
@@ -375,6 +397,45 @@ export default function SettingsPage() {
             >
               Gerenciar Base de Conhecimento
             </button>
+          </div>
+        </div>
+
+        {/* Telefone de Suporte Humano */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <span className="text-2xl">📞</span>
+            <h2 className="text-lg font-semibold text-gray-900">Atendimento Humano</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                Quando um cliente solicitar falar com um humano, uma notificação será enviada para este número com os dados do cliente.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Telefone para Notificações
+              </label>
+              <input
+                type="text"
+                value={aiSettings.support_phone}
+                onChange={(e) => setAiSettings({ ...aiSettings, support_phone: e.target.value })}
+                placeholder="5511999999999"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Digite o número com código do país (ex: 5511999999999)
+              </p>
+            </div>
+
+            <div className={`flex items-center space-x-2 p-3 rounded-lg ${aiSettings.support_phone ? 'bg-green-50 border border-green-200' : 'bg-gray-100'}`}>
+              <div className={`w-3 h-3 rounded-full ${aiSettings.support_phone ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+              <span className={`text-sm font-medium ${aiSettings.support_phone ? 'text-green-700' : 'text-gray-600'}`}>
+                {aiSettings.support_phone ? '✅ Telefone configurado' : '⚪ Telefone não configurado'}
+              </span>
+            </div>
           </div>
         </div>
       </div>

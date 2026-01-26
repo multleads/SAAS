@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
+import Logo from '@/components/Logo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,9 +29,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-2xl">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">MultLeads AI</h2>
-          <p className="mt-2 text-sm text-gray-600">Faça login para continuar</p>
+        <div className="text-center flex flex-col items-center">
+          <Logo width={150} height={60} variant="dark" />
+          <p className="mt-4 text-sm text-gray-600">Faça login para continuar</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -80,11 +81,6 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="text-center">
-            <p className="text-xs text-gray-500">
-              Credenciais padrão: admin@multleads.com / admin123
-            </p>
-          </div>
         </form>
       </div>
     </div>

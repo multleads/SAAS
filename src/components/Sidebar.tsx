@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useEffect, useState } from 'react';
 import { getAIConfig, AIConfig } from '@/lib/aiConfig';
+import Logo from './Logo';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -101,8 +102,8 @@ export default function Sidebar() {
   return (
     <div className="w-64 bg-gray-900 text-white flex flex-col h-screen">
       <div className="p-4 border-b border-gray-800">
-        <h1 className="text-xl font-bold">MultLeads AI</h1>
-        <p className="text-xs text-gray-400 mt-1">{user?.name}</p>
+        <Logo width={100} height={40} variant="light" />
+        <p className="text-xs text-gray-400 mt-2">{user?.name}</p>
         {aiConfig?.enabled && (
           <div className="mt-2 inline-flex items-center space-x-2 px-2 py-1 rounded bg-primary-700 text-xs">
             <span>🤖</span>

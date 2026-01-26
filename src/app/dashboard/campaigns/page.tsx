@@ -62,6 +62,7 @@ export default function CampaignsPage() {
   const [isPaused, setIsPaused] = useState(false);
   const [currentCampaign, setCurrentCampaign] = useState<Campaign | null>(null);
   const [campaignHistory, setCampaignHistory] = useState<Campaign[]>([]);
+  const [unsubscribedPhones, setUnsubscribedPhones] = useState<string[]>([]);
   const abortRef = useRef(false);
 
   const isAdmin = user?.role === 'admin_master' || user?.role === 'admin_company' || user?.role === 'admin';
@@ -92,6 +93,12 @@ export default function CampaignsPage() {
     const storedHistory = localStorage.getItem(`campaign_history_${user?.company_id}`);
     if (storedHistory) {
       setCampaignHistory(JSON.parse(storedHistory));
+    }
+    
+    // Load unsubscribed phones
+    const storedUnsubscribed = localStorage.getItem(`unsubscribed_${user?.company_id}`);
+    if (storedUnsubscribed) {
+      setUnsubscribedPhones(JSON.parse(storedUnsubscribed));
     }
     
     // Load connected instance
@@ -245,10 +252,23 @@ export default function CampaignsPage() {
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  const isPhoneUnsubscribed = (phone: string): boolean => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    return unsubscribedPhones.includes(cleanPhone);
+  };
+
   const sendMessageToClient = async (client: Client, instanceName: string): Promise<boolean> => {
     try {
       const phone = client.phone.replace(/\D/g, '');
       const remoteJid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
+
+      // Check if client is unsubscribed
+      console.log('Checking if unsubscribed:', phone, 'List:', unsubscribedPhones);
+      if (isPhoneUnsubscribed(phone)) {
+        console.log('Skipping unsubscribed client:', client.name, phone);
+        return true; // Return true to not count as failure
+      }
+      console.log('Client is NOT unsubscribed, proceeding with send');
 
       // Send text message if exists
       if (messageText.trim()) {
@@ -256,6 +276,8 @@ export default function CampaignsPage() {
           .replace(/{nome}/g, client.name)
           .replace(/{telefone}/g, client.phone);
 
+        console.log('Sending text to:', phone, 'remoteJid:', remoteJid, 'instance:', instanceName);
+        
         const textResponse = await fetch('/api/send-message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -266,8 +288,13 @@ export default function CampaignsPage() {
           })
         });
         const textData = await textResponse.json();
-        console.log('Text message sent:', textData);
-        await delay(1000);
+        console.log('Text message response:', textData);
+        
+        if (!textData.success) {
+          console.error('Failed to send text:', textData);
+          throw new Error('Failed to send text message');
+        }
+        await delay(300); // Faster delay for registered clients
       }
 
       // Send extra image if exists
@@ -285,14 +312,23 @@ export default function CampaignsPage() {
         });
         const mediaData = await mediaResponse.json();
         console.log('Extra image sent:', mediaData);
-        await delay(1500);
+        await delay(500); // Faster delay
       }
 
       // Send catalog products
+      console.log('Selected catalogs:', selectedCatalogs);
+      console.log('Available catalogs:', catalogs);
+      
       for (const catalogId of selectedCatalogs) {
         const catalog = catalogs.find(c => c.id === catalogId);
-        if (catalog) {
+        console.log('Processing catalog:', catalogId, 'Found:', catalog);
+        
+        if (catalog && catalog.products && catalog.products.length > 0) {
+          console.log('Catalog products:', catalog.products);
+          
           for (const product of catalog.products) {
+            console.log('Processing product:', product.name, 'Has image:', !!product.imageUrl);
+            
             if (product.imageUrl) {
               const productResponse = await fetch('/api/send-media', {
                 method: 'POST',
@@ -307,10 +343,30 @@ export default function CampaignsPage() {
               });
               const productData = await productResponse.json();
               console.log('Product image sent:', product.name, productData);
-              await delay(2000); // Delay between products
+              await delay(500); // Fast delay for registered clients
             }
           }
+        } else {
+          console.log('Catalog not found or has no products:', catalogId);
         }
+      }
+
+      // Send unsubscribe link after all images
+      if (selectedCatalogs.length > 0 || extraImage || messageText.trim()) {
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://frontend-iota-flax-21.vercel.app';
+        const unsubscribeLink = `${baseUrl}/unsubscribe/${encodeURIComponent(phone)}?c=${user?.company_id || '1'}`;
+        const unsubscribeMessage = `\n\n_Para não receber mais mensagens promocionais, clique aqui:_\n${unsubscribeLink}`;
+        
+        await fetch('/api/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instance: instanceName,
+            remoteJid,
+            message: unsubscribeMessage
+          })
+        });
+        await delay(200);
       }
 
       return true;
@@ -345,7 +401,12 @@ export default function CampaignsPage() {
 
     toast.success(`Iniciando campanha para ${filtered.length} clientes...`);
 
+    console.log('Starting campaign for', filtered.length, 'clients');
+    console.log('Filtered clients:', filtered);
+    
     for (let i = 0; i < filtered.length; i++) {
+      console.log(`Processing client ${i + 1}/${filtered.length}:`, filtered[i].name);
+      
       // Check if paused or aborted
       while (isPaused && !abortRef.current) {
         await delay(500);
@@ -359,20 +420,23 @@ export default function CampaignsPage() {
       const client = filtered[i];
       
       if (connectedInstance?.instanceName) {
+        console.log('Sending to client:', client.name, 'phone:', client.phone);
         const success = await sendMessageToClient(client, connectedInstance.instanceName);
+        console.log('Send result for', client.name, ':', success);
         if (success) {
           campaign.sentCount++;
         } else {
           campaign.failedCount++;
         }
       } else {
+        console.log('No connected instance for client:', client.name);
         campaign.failedCount++;
       }
 
       setCurrentCampaign({ ...campaign });
       
-      // Random delay between 3-6 seconds to avoid blocking
-      await delay(3000 + Math.random() * 3000);
+      // Fast delay between clients (500ms-1s)
+      await delay(500 + Math.random() * 500);
     }
 
     if (!abortRef.current) {
