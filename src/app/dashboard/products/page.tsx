@@ -3,20 +3,26 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, Edit2, Package, Image, X, FolderOpen, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit2, Package, Image, X, FolderOpen, ArrowLeft, RefreshCw } from 'lucide-react';
 
 interface Product {
   id: string;
   name: string;
-  imageUrl: string;
-  createdAt: string;
+  reference?: string;
+  description?: string;
+  price?: number;
+  image_url: string;
+  imageUrl?: string; // For backwards compatibility
+  createdAt?: string;
 }
 
 interface Catalog {
   id: string;
   name: string;
+  description?: string;
   products: Product[];
-  createdAt: string;
+  product_count?: number;
+  createdAt?: string;
 }
 
 export default function ProductsPage() {
@@ -24,12 +30,17 @@ export default function ProductsPage() {
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [selectedCatalog, setSelectedCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingCatalog, setEditingCatalog] = useState<Catalog | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [catalogName, setCatalogName] = useState('');
+  const [catalogDescription, setCatalogDescription] = useState('');
   const [productName, setProductName] = useState('');
+  const [productReference, setProductReference] = useState('');
+  const [productDescription, setProductDescription] = useState('');
+  const [productPrice, setProductPrice] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
@@ -37,24 +48,43 @@ export default function ProductsPage() {
   const isAdmin = user?.role === 'admin_master' || user?.role === 'admin_company' || user?.role === 'admin';
 
   useEffect(() => {
-    loadCatalogs();
+    if (user?.company_id) {
+      loadCatalogs();
+    }
   }, [user?.company_id]);
 
-  const loadCatalogs = () => {
-    const stored = localStorage.getItem(`catalogs_${user?.company_id}`);
-    if (stored) {
-      setCatalogs(JSON.parse(stored));
+  const loadCatalogs = async () => {
+    if (!user?.company_id) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/catalogs?company_id=${user.company_id}`);
+      const data = await response.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        setCatalogs(data.data);
+      } else {
+        setCatalogs([]);
+      }
+    } catch (error) {
+      console.error('Error loading catalogs:', error);
+      toast.error('Erro ao carregar catálogos');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const saveCatalogs = (newCatalogs: Catalog[]) => {
-    localStorage.setItem(`catalogs_${user?.company_id}`, JSON.stringify(newCatalogs));
-    setCatalogs(newCatalogs);
-    // Update selectedCatalog if it exists
-    if (selectedCatalog) {
-      const updated = newCatalogs.find(c => c.id === selectedCatalog.id);
-      setSelectedCatalog(updated || null);
+  const loadCatalogProducts = async (catalogId: string) => {
+    try {
+      const response = await fetch(`/api/catalogs?id=${catalogId}`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        setSelectedCatalog(data.data);
+      }
+    } catch (error) {
+      console.error('Error loading catalog products:', error);
+      toast.error('Erro ao carregar produtos');
     }
   };
 
@@ -123,7 +153,7 @@ export default function ProductsPage() {
   };
 
   // Catalog handlers
-  const handleCatalogSubmit = (e: React.FormEvent) => {
+  const handleCatalogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!catalogName.trim()) {
@@ -131,27 +161,51 @@ export default function ProductsPage() {
       return;
     }
 
-    if (editingCatalog) {
-      const newCatalogs = catalogs.map(c => 
-        c.id === editingCatalog.id ? { ...c, name: catalogName.trim() } : c
-      );
-      saveCatalogs(newCatalogs);
-      toast.success('Catálogo atualizado!');
-    } else {
-      const newCatalog: Catalog = {
-        id: Date.now().toString(),
-        name: catalogName.trim(),
-        products: [],
-        createdAt: new Date().toISOString()
-      };
-      saveCatalogs([...catalogs, newCatalog]);
-      toast.success('Catálogo criado!');
+    setSaving(true);
+    try {
+      if (editingCatalog) {
+        const response = await fetch(`/api/catalogs?id=${editingCatalog.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: catalogName.trim(), description: catalogDescription.trim() })
+        });
+        const data = await response.json();
+        if (data.success) {
+          toast.success('Catálogo atualizado!');
+          loadCatalogs();
+        } else {
+          toast.error(data.message || 'Erro ao atualizar catálogo');
+        }
+      } else {
+        const response = await fetch('/api/catalogs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            company_id: user?.company_id,
+            name: catalogName.trim(),
+            description: catalogDescription.trim()
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          toast.success('Catálogo criado!');
+          loadCatalogs();
+        } else {
+          toast.error(data.message || 'Erro ao criar catálogo');
+        }
+      }
+      resetCatalogForm();
+    } catch (error) {
+      console.error('Error saving catalog:', error);
+      toast.error('Erro ao salvar catálogo');
+    } finally {
+      setSaving(false);
     }
-    resetCatalogForm();
   };
 
   const resetCatalogForm = () => {
     setCatalogName('');
+    setCatalogDescription('');
     setEditingCatalog(null);
     setShowCatalogModal(false);
   };
@@ -159,22 +213,33 @@ export default function ProductsPage() {
   const handleEditCatalog = (catalog: Catalog) => {
     setEditingCatalog(catalog);
     setCatalogName(catalog.name);
+    setCatalogDescription(catalog.description || '');
     setShowCatalogModal(true);
   };
 
-  const handleDeleteCatalog = (id: string) => {
+  const handleDeleteCatalog = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este catálogo e todos os seus produtos?')) {
-      const newCatalogs = catalogs.filter(c => c.id !== id);
-      saveCatalogs(newCatalogs);
-      if (selectedCatalog?.id === id) {
-        setSelectedCatalog(null);
+      try {
+        const response = await fetch(`/api/catalogs?id=${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          if (selectedCatalog?.id === id) {
+            setSelectedCatalog(null);
+          }
+          loadCatalogs();
+          toast.success('Catálogo excluído!');
+        } else {
+          toast.error(data.message || 'Erro ao excluir catálogo');
+        }
+      } catch (error) {
+        console.error('Error deleting catalog:', error);
+        toast.error('Erro ao excluir catálogo');
       }
-      toast.success('Catálogo excluído!');
     }
   };
 
   // Product handlers
-  const handleProductSubmit = (e: React.FormEvent) => {
+  const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!productName.trim()) {
@@ -182,38 +247,70 @@ export default function ProductsPage() {
       return;
     }
 
-    if (!imagePreview && !editingProduct?.imageUrl) {
+    const imageUrl = imagePreview || editingProduct?.image_url || editingProduct?.imageUrl;
+    if (!imageUrl) {
       toast.error('Imagem do produto é obrigatória');
       return;
     }
 
     if (!selectedCatalog) return;
 
-    const newProduct: Product = {
-      id: editingProduct?.id || Date.now().toString(),
-      name: productName.trim(),
-      imageUrl: imagePreview || editingProduct?.imageUrl || '',
-      createdAt: editingProduct?.createdAt || new Date().toISOString()
-    };
-
-    const updatedCatalog = { ...selectedCatalog };
-    if (editingProduct) {
-      updatedCatalog.products = updatedCatalog.products.map(p => 
-        p.id === editingProduct.id ? newProduct : p
-      );
-      toast.success('Produto atualizado!');
-    } else {
-      updatedCatalog.products = [...updatedCatalog.products, newProduct];
-      toast.success('Produto cadastrado!');
+    setSaving(true);
+    try {
+      if (editingProduct) {
+        const response = await fetch(`/api/catalog-products?id=${editingProduct.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: productName.trim(),
+            reference: productReference.trim() || null,
+            description: productDescription.trim() || null,
+            price: productPrice ? parseFloat(productPrice) : null,
+            image_url: imageUrl
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          toast.success('Produto atualizado!');
+          loadCatalogProducts(selectedCatalog.id);
+        } else {
+          toast.error(data.message || 'Erro ao atualizar produto');
+        }
+      } else {
+        const response = await fetch('/api/catalog-products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            catalog_id: selectedCatalog.id,
+            name: productName.trim(),
+            reference: productReference.trim() || null,
+            description: productDescription.trim() || null,
+            price: productPrice ? parseFloat(productPrice) : null,
+            image_url: imageUrl
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          toast.success('Produto cadastrado!');
+          loadCatalogProducts(selectedCatalog.id);
+        } else {
+          toast.error(data.message || 'Erro ao criar produto');
+        }
+      }
+      resetProductForm();
+    } catch (error) {
+      console.error('Error saving product:', error);
+      toast.error('Erro ao salvar produto');
+    } finally {
+      setSaving(false);
     }
-
-    const newCatalogs = catalogs.map(c => c.id === selectedCatalog.id ? updatedCatalog : c);
-    saveCatalogs(newCatalogs);
-    resetProductForm();
   };
 
   const resetProductForm = () => {
     setProductName('');
+    setProductReference('');
+    setProductDescription('');
+    setProductPrice('');
     setImagePreview(null);
     setImageFile(null);
     setEditingProduct(null);
@@ -223,20 +320,29 @@ export default function ProductsPage() {
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setProductName(product.name);
-    setImagePreview(product.imageUrl);
+    setProductReference(product.reference || '');
+    setProductDescription(product.description || '');
+    setProductPrice(product.price ? product.price.toString() : '');
+    setImagePreview(product.image_url || product.imageUrl || null);
     setShowProductModal(true);
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     if (!selectedCatalog) return;
     if (confirm('Tem certeza que deseja excluir este produto?')) {
-      const updatedCatalog = {
-        ...selectedCatalog,
-        products: selectedCatalog.products.filter(p => p.id !== productId)
-      };
-      const newCatalogs = catalogs.map(c => c.id === selectedCatalog.id ? updatedCatalog : c);
-      saveCatalogs(newCatalogs);
-      toast.success('Produto excluído!');
+      try {
+        const response = await fetch(`/api/catalog-products?id=${productId}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          loadCatalogProducts(selectedCatalog.id);
+          toast.success('Produto excluído!');
+        } else {
+          toast.error(data.message || 'Erro ao excluir produto');
+        }
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        toast.error('Erro ao excluir produto');
+      }
     }
   };
 
@@ -297,8 +403,8 @@ export default function ProductsPage() {
             {selectedCatalog.products.map((product) => (
               <div key={product.id} className="bg-white rounded-lg shadow overflow-hidden group">
                 <div className="aspect-square relative bg-gray-100">
-                  {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                  {(product.image_url || product.imageUrl) ? (
+                    <img src={product.image_url || product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Image className="w-12 h-12 text-gray-400" />
@@ -363,9 +469,25 @@ export default function ProductsPage() {
                   <input type="text" value={productName} onChange={(e) => setProductName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-gray-900" placeholder="Ex: Etiqueta NFC Premium" />
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Referência</label>
+                    <input type="text" value={productReference} onChange={(e) => setProductReference(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-gray-900" placeholder="Ex: NFC-001" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>
+                    <input type="number" step="0.01" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-gray-900" placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                  <textarea value={productDescription} onChange={(e) => setProductDescription(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-gray-900" placeholder="Descrição do produto..." />
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-4">
                   <button type="button" onClick={resetProductForm} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-                  <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">{editingProduct ? 'Salvar' : 'Cadastrar'}</button>
+                  <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{saving ? 'Salvando...' : (editingProduct ? 'Salvar' : 'Cadastrar')}</button>
                 </div>
               </form>
             </div>
@@ -413,12 +535,12 @@ export default function ProductsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {catalogs.map((catalog) => (
-            <div key={catalog.id} className="bg-white rounded-lg shadow overflow-hidden group cursor-pointer" onClick={() => setSelectedCatalog(catalog)}>
+            <div key={catalog.id} className="bg-white rounded-lg shadow overflow-hidden group cursor-pointer" onClick={() => loadCatalogProducts(catalog.id)}>
               <div className="aspect-video relative bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
                 <FolderOpen className="w-16 h-16 text-white opacity-80" />
-                {catalog.products.length > 0 && (
+                {(catalog.product_count || 0) > 0 && (
                   <div className="absolute top-2 right-2 bg-white text-primary-600 text-xs font-bold px-2 py-1 rounded-full">
-                    {catalog.products.length} {catalog.products.length === 1 ? 'produto' : 'produtos'}
+                    {catalog.product_count} {catalog.product_count === 1 ? 'produto' : 'produtos'}
                   </div>
                 )}
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -434,9 +556,11 @@ export default function ProductsPage() {
               </div>
               <div className="p-4">
                 <h3 className="font-medium text-gray-900 truncate">{catalog.name}</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  Criado em {new Date(catalog.createdAt).toLocaleDateString('pt-BR')}
-                </p>
+                {catalog.createdAt && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Criado em {new Date(catalog.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
+                )}
               </div>
             </div>
           ))}

@@ -191,6 +191,7 @@ async function getAiSettingsFromBackend(instanceName: string): Promise<any> {
             const knowledgeBase = await getCompanyKnowledgeBase(instance.company_id);
             
             return {
+              company_id: instance.company_id,
               auto_ai_response: settingsData.data.auto_ai_response !== false,
               openai_api_key: settingsData.data.openai_api_key,
               model: settingsData.data.model || 'gpt-4',
@@ -218,6 +219,148 @@ async function getAiSettingsFromBackend(instanceName: string): Promise<any> {
   
   console.log('Webhook: No API key found');
   return null;
+}
+
+// Check if user wants to see catalog
+function wantsCatalog(message: string): { wants: boolean; specificCatalog?: string } {
+  const catalogKeywords = [
+    'catalogo', 'catálogo', 'catalogos', 'catálogos',
+    'ver produtos', 'ver os produtos', 'mostrar produtos',
+    'quero ver', 'me mostra', 'me mostre',
+    'fotos dos produtos', 'fotos de produtos',
+    'imagens dos produtos', 'imagens de produtos',
+    'o que voces tem', 'o que vocês tem', 'o que vocês têm',
+    'produtos disponiveis', 'produtos disponíveis',
+    'quais produtos', 'lista de produtos'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  const wants = catalogKeywords.some(keyword => lowerMessage.includes(keyword));
+  
+  if (wants) {
+    console.log('Webhook: User wants catalog, detected in:', lowerMessage);
+  }
+  
+  return { wants };
+}
+
+// Get catalogs for a company
+async function getCompanyCatalogs(companyId: number): Promise<any[]> {
+  try {
+    const response = await fetch(
+      `http://talkagents.br.com/public_html/api_proxy.php?path=catalogs&company_id=${companyId}`,
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        console.log('Webhook: Found', data.data.length, 'catalogs');
+        return data.data;
+      }
+    }
+  } catch (error) {
+    console.log('Webhook: Error fetching catalogs:', error);
+  }
+  return [];
+}
+
+// Get catalog with products
+async function getCatalogWithProducts(catalogId: number): Promise<any> {
+  try {
+    const response = await fetch(
+      `http://talkagents.br.com/public_html/api_proxy.php?path=catalogs&id=${catalogId}`,
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (error) {
+    console.log('Webhook: Error fetching catalog:', error);
+  }
+  return null;
+}
+
+// Send catalog images to customer
+async function sendCatalogImages(instance: string, number: string, catalog: any) {
+  try {
+    const products = catalog.products || [];
+    
+    if (products.length === 0) {
+      await fetch(`${EVOLUTION_URL}/message/sendText/${instance}`, {
+        method: 'POST',
+        headers: { 'apikey': API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number,
+          text: `O catálogo "${catalog.name}" ainda não possui produtos cadastrados. 😅`
+        })
+      });
+      return;
+    }
+    
+    // Send intro message
+    await fetch(`${EVOLUTION_URL}/message/sendText/${instance}`, {
+      method: 'POST',
+      headers: { 'apikey': API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        number,
+        text: `📦 *${catalog.name}*\n\nAqui estão nossos produtos (${products.length} itens):`
+      })
+    });
+    
+    // Small delay between messages
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Send each product image with caption
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+      const caption = `*${product.name}*${product.reference ? `\nRef: ${product.reference}` : ''}${product.price ? `\n💰 R$ ${parseFloat(product.price).toFixed(2)}` : ''}${product.description ? `\n\n${product.description}` : ''}`;
+      
+      try {
+        // Check if image_url is base64 or URL
+        if (product.image_url.startsWith('data:image')) {
+          // Send base64 image
+          await fetch(`${EVOLUTION_URL}/message/sendMedia/${instance}`, {
+            method: 'POST',
+            headers: { 'apikey': API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              number,
+              mediatype: 'image',
+              media: product.image_url,
+              caption
+            })
+          });
+        } else {
+          // Send URL image
+          await fetch(`${EVOLUTION_URL}/message/sendMedia/${instance}`, {
+            method: 'POST',
+            headers: { 'apikey': API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              number,
+              mediatype: 'image',
+              media: product.image_url,
+              caption
+            })
+          });
+        }
+        
+        // Delay between images to avoid rate limiting
+        if (i < products.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (imgError) {
+        console.error('Webhook: Error sending product image:', imgError);
+      }
+    }
+    
+    console.log('Webhook: Sent', products.length, 'product images');
+  } catch (error) {
+    console.error('Webhook: Error sending catalog images:', error);
+  }
 }
 
 // Check if user wants to talk to a human
@@ -287,16 +430,103 @@ async function generateAiResponse(instance: string, remoteJid: string, userMessa
   try {
     const baseUrl = 'https://frontend-iota-flax-21.vercel.app';
     
+    // Format number
+    let number = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+    if (number.length === 11 && !number.startsWith('55')) {
+      number = '55' + number;
+    }
+    
+    // Check if user wants catalog
+    const catalogRequest = wantsCatalog(userMessage);
+    if (catalogRequest.wants && settings.company_id) {
+      console.log('Webhook: User wants catalog!');
+      
+      const catalogs = await getCompanyCatalogs(settings.company_id);
+      
+      if (catalogs.length === 0) {
+        await fetch(`${EVOLUTION_URL}/message/sendText/${instance}`, {
+          method: 'POST',
+          headers: { 'apikey': API_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            number,
+            text: 'Ainda não temos catálogos cadastrados. Em breve teremos novidades! 😊'
+          })
+        });
+        return;
+      }
+      
+      if (catalogs.length === 1) {
+        // Only one catalog, send it directly
+        const catalog = await getCatalogWithProducts(catalogs[0].id);
+        if (catalog) {
+          await sendCatalogImages(instance, number, catalog);
+        }
+        return;
+      }
+      
+      // Multiple catalogs, ask which one
+      let catalogList = '📚 *Nossos Catálogos*\n\nQual catálogo você gostaria de ver?\n\n';
+      catalogs.forEach((cat: any, index: number) => {
+        catalogList += `${index + 1}. *${cat.name}* (${cat.product_count || 0} produtos)\n`;
+      });
+      catalogList += '\nDigite o número ou o nome do catálogo desejado, ou digite *todos* para ver todos.';
+      
+      await fetch(`${EVOLUTION_URL}/message/sendText/${instance}`, {
+        method: 'POST',
+        headers: { 'apikey': API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number, text: catalogList })
+      });
+      return;
+    }
+    
+    // Check if user is selecting a catalog (number or name)
+    if (settings.company_id) {
+      const catalogs = await getCompanyCatalogs(settings.company_id);
+      if (catalogs.length > 0) {
+        const lowerMessage = userMessage.toLowerCase().trim();
+        
+        // Check if user typed "todos" or "all"
+        if (lowerMessage === 'todos' || lowerMessage === 'all' || lowerMessage === 'ver todos') {
+          for (const cat of catalogs) {
+            const catalog = await getCatalogWithProducts(cat.id);
+            if (catalog) {
+              await sendCatalogImages(instance, number, catalog);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          }
+          return;
+        }
+        
+        // Check if user typed a number
+        const catalogNumber = parseInt(lowerMessage);
+        if (!isNaN(catalogNumber) && catalogNumber >= 1 && catalogNumber <= catalogs.length) {
+          const catalog = await getCatalogWithProducts(catalogs[catalogNumber - 1].id);
+          if (catalog) {
+            await sendCatalogImages(instance, number, catalog);
+          }
+          return;
+        }
+        
+        // Check if user typed a catalog name
+        const matchedCatalog = catalogs.find((cat: any) => 
+          cat.name.toLowerCase().includes(lowerMessage) || lowerMessage.includes(cat.name.toLowerCase())
+        );
+        if (matchedCatalog) {
+          const catalog = await getCatalogWithProducts(matchedCatalog.id);
+          if (catalog) {
+            await sendCatalogImages(instance, number, catalog);
+          }
+          return;
+        }
+      }
+    }
+    
     // Check if user wants human support
     if (wantsHumanSupport(userMessage)) {
       console.log('Webhook: User wants human support!');
       
-      // Format customer number
+      // Customer number already formatted above
       let customerNumber = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
-      let number = customerNumber;
-      if (number.length === 11 && !number.startsWith('55')) {
-        number = '55' + number;
-      }
       
       // ALWAYS pause the chat so AI stops responding
       try {
@@ -360,12 +590,6 @@ async function generateAiResponse(instance: string, remoteJid: string, userMessa
     }
 
     console.log('Webhook: Sending AI response to', remoteJid);
-
-    // Format number
-    let number = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
-    if (number.length === 11 && !number.startsWith('55')) {
-      number = '55' + number;
-    }
 
     // Send the response via Evolution API
     await fetch(`${EVOLUTION_URL}/message/sendText/${instance}`, {
